@@ -558,7 +558,7 @@ public enum BridgeMethods {
     REGISTER_BTC_COINBASE_TRANSACTION(
             CallTransaction.Function.fromSignature(
             "registerBtcCoinbaseTransaction",
-                    new String[]{"bytes", "int", "bytes"},
+                    new String[]{"bytes", "bytes32", "bytes", "bytes32", "bytes"},
                     new String[]{}
             ),
             fixedCost(22000L), // TODO: Recalculate values for this functions. At the moment we are using the same value as registerBtcTransaction
@@ -569,7 +569,7 @@ public enum BridgeMethods {
     HAS_BTC_BLOCK_COINBASE_TRANSACTION_INFORMATION(
             CallTransaction.Function.fromSignature(
                     "hasBtcBlockCoinbaseTransactionInformation",
-                    new String[]{"int"},
+                    new String[]{"bytes32"},
                     new String[]{"bool"}
             ),
             fixedCost(5000L), // TODO: Recalculate values for this functions.

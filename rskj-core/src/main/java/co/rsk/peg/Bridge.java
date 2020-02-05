@@ -1068,11 +1068,13 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         logger.trace("registerBtcCoinbaseTransaction");
 
         byte[] btcTxSerialized = (byte[]) args[0];
-        int height = ((BigInteger)args[1]).intValue();
-
+        Sha256Hash blockHash = (Sha256Hash) args[1];
         byte[] pmtSerialized = (byte[]) args[2];
+        Sha256Hash witnessMerkleRoot = (Sha256Hash) args[3];
+        byte[] witnessReservedValue = (byte[]) args[4];
+
         try {
-            bridgeSupport.registerBtcCoinbaseTransaction(btcTxSerialized, height, pmtSerialized);
+            bridgeSupport.registerBtcCoinbaseTransaction(btcTxSerialized, blockHash, pmtSerialized, witnessMerkleRoot, witnessReservedValue);
         } catch (IOException | BlockStoreException e) {
             logger.warn("Exception in registerBtcCoinbaseTransaction", e);
             throw new RuntimeException("Exception in registerBtcCoinbaseTransaction", e);
@@ -1082,9 +1084,9 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
     public Boolean hasBtcBlockCoinbaseTransactionInformation(Object[] args) throws BlockStoreException
     {
         logger.trace("hasBtcBlockCoinbaseTransactionInformation");
-        int height = ((BigInteger)args[0]).intValue();
+        Sha256Hash blockHash = (Sha256Hash) args[0];
 
-        return bridgeSupport.hasBtcBlockCoinbaseTransactionInformation(height);
+        return bridgeSupport.hasBtcBlockCoinbaseTransactionInformation(blockHash);
     }
 
     public static BridgeMethods.BridgeMethodExecutor activeAndRetiringFederationOnly(BridgeMethods.BridgeMethodExecutor decoratee, String funcName) {
