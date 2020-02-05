@@ -30,6 +30,7 @@ import co.rsk.config.BridgeConstants;
 import co.rsk.core.RskAddress;
 import co.rsk.crypto.Keccak256;
 import co.rsk.panic.PanicProcessor;
+import co.rsk.peg.bitcoin.CoinbaseInformation;
 import co.rsk.peg.bitcoin.MerkleBranch;
 import co.rsk.peg.btcLockSender.BtcLockSender;
 import co.rsk.peg.btcLockSender.BtcLockSenderProvider;
@@ -1950,8 +1951,7 @@ public class BridgeSupport {
 
     public void registerBtcCoinbaseTransaction(byte[] btcTxSerialized, int height, byte[] pmtSerialized) throws IOException, BlockStoreException {
         Context.propagate(btcContext);
-
-        // TODO: Ask if the block already has witness root, then return.
+        this.ensureBtcBlockStore();
 
         Sha256Hash btcTxHash = BtcTransactionFormatUtils.calculateBtcTxHash(btcTxSerialized);
 
@@ -2015,15 +2015,22 @@ public class BridgeSupport {
         BtcTransaction btcTx = new BtcTransaction(bridgeConstants.getBtcParams(), btcTxSerialized);
         btcTx.verify();
 
-        // TODO: Call to bitcoinj-thin to extract witness commitment using coinbase.
+        CoinbaseInformation coinbaseInformation = new CoinbaseInformation(btcTx.findWitnessCommitment(), null);
+        provider.setCoinbaseInformation(btcTx.getHash(), coinbaseInformation);
     }
 
-    public boolean hasBtcBlockCoinbaseTransactionInformation(int height)
+    public boolean hasBtcBlockCoinbaseTransactionInformation(int height) throws BlockStoreException
     {
-        //TODO: Call bitcoinj-thin using height to know if in this height cointains witness commitment information.
-        return true; //Return a value indicated if the height of the block contains info.
-    }
+        StoredBlock storedBlock = btcBlockStore.getStoredBlockAtMainChainHeight(height);
 
+        if (storedBlock != null) {
+            CoinbaseInformation coinbaseInformation = provider.getCoinbaseInformation(storedBlock.getHeader().getHash());
+            if (coinbaseInformation != null) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private StoredBlock getBtcBlockchainChainHead() throws IOException, BlockStoreException {
         // Gather the current btc chain's head
@@ -2197,6 +2204,25 @@ public class BridgeSupport {
         Coin currentBridgeBalance = rskRepository.getBalance(PrecompiledContracts.BRIDGE_ADDR).toBitcoin();
 
         return maxRbtc.subtract(currentBridgeBalance);
+    }
+
+    /** Extracts the reserved value from a coinbase transaction. */
+    private byte[] getWitnessReservedValue(BtcTransaction btcCoinbaseTx) {
+        byte[] witnessReserved = null;
+        TransactionWitness witness = btcCoinbaseTx.getWitness(0);
+        if (witness.getPushCount() != 1)
+            // Coinbase witness reserved invalid: push count
+            return null;
+        witnessReserved = witness.getPush(0);
+        if (witnessReserved.length != 32)
+            // Coinbase witness reserved invalid: length
+            return null;
+        return witnessReserved;
+    }
+
+
+    private Sha256Hash calculateWitnessCommitment(byte[] witnessRoot, byte[] witnessReserved) {
+        return Sha256Hash.twiceOf(witnessRoot, witnessReserved);
     }
 }
 

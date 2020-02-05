@@ -1079,10 +1079,9 @@ public class Bridge extends PrecompiledContracts.PrecompiledContract {
         }
     }
 
-    public Boolean hasBtcBlockCoinbaseTransactionInformation(Object[] args)
+    public Boolean hasBtcBlockCoinbaseTransactionInformation(Object[] args) throws BlockStoreException
     {
         logger.trace("hasBtcBlockCoinbaseTransactionInformation");
-
         int height = ((BigInteger)args[0]).intValue();
 
         return bridgeSupport.hasBtcBlockCoinbaseTransactionInformation(height);
