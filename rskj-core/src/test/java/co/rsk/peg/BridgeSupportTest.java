@@ -3631,17 +3631,12 @@ public class BridgeSupportTest {
                 activations
         );
 
-        byte[] bits = new byte[1];
-        bits[0] = 0x01;
-        List<Sha256Hash> hashes = new ArrayList<>();
-        PartialMerkleTree pmt = new PartialMerkleTree(btcParams, bits, hashes, 1);
-
        //Leaving no confirmation blocks
         int height = 5;
         mockChainOfStoredBlocks(btcBlockStore, mock(BtcBlock.class), 5, height);
         when(btcBlockStore.getFromCache(mock(Sha256Hash.class))).thenReturn(new StoredBlock(mock(BtcBlock.class), BigInteger.ZERO, 0));
 
-        bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), mock(Sha256Hash.class), pmt.bitcoinSerialize(), mock(Sha256Hash.class), witnessReservedValue);
+        bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), mock(Sha256Hash.class), new byte[]{6,6,6}, mock(Sha256Hash.class), witnessReservedValue);
         verify(mock(BridgeStorageProvider.class), never()).setCoinbaseInformation(any(Sha256Hash.class), any(CoinbaseInformation.class));
     }
 
@@ -3717,16 +3712,7 @@ public class BridgeSupportTest {
         Repository repository = createRepository();
         Repository track = repository.startTracking();
 
-        byte[] rawTx = Hex.decode("020000000001010000000000000000000000000000000000000000000000000000000000000000fff" +
-                "fffff0502cc000101ffffffff029c070395000000002321036d6b5bc8c0e902f296b5bdf3dfd4b6f095d8d0987818a557e1766e" +
-                "a25c664524ac0000000000000000266a24aa21a9edfeb3b9170ae765cc6586edd67229eaa8bc19f9674d64cb10ee8a205f4ccf0" +
-                "bc60120000000000000000000000000000000000000000000000000000000000000000000000000");
-
-        BtcTransaction tx1 = new BtcTransaction(btcParams, rawTx);
-        BtcTransaction txWithoutWitness = new BtcTransaction(btcParams, rawTx);
-
-        Sha256Hash secondHashTx = Sha256Hash.wrap(Hex.decode("e3d0840a0825fb7d880e5cb8306745352920a8c7e8a30fac882b275e26c6bb65"));
-        byte[] witnessReservedValue = tx1.getWitness(0).getPush(0);
+        BtcTransaction tx = new BtcTransaction(btcParams);
 
         BtcBlockStoreWithCache btcBlockStore = mock(BtcBlockStoreWithCache.class);
         BtcBlockStoreWithCache.Factory mockFactory = mock(BtcBlockStoreWithCache.Factory.class);
@@ -3748,9 +3734,8 @@ public class BridgeSupportTest {
         bits[0] = 0x3f;
 
         List<Sha256Hash> hashes = new ArrayList<>();
-        hashes.add(tx1.getHash());
-        hashes.add(secondHashTx);
-        PartialMerkleTree pmt = new PartialMerkleTree(btcParams, bits, hashes, 2);
+        hashes.add(tx.getHash());
+        PartialMerkleTree pmt = new PartialMerkleTree(btcParams, bits, hashes, 1);
         List<Sha256Hash> hashlist = new ArrayList<>();
         Sha256Hash merkleRoot = pmt.getTxnHashAndMerkleRoot(hashlist);
 
@@ -3769,11 +3754,8 @@ public class BridgeSupportTest {
         int height = 5;
         mockChainOfStoredBlocks(btcBlockStore, registerHeader, 5, height);
         when(btcBlockStore.getFromCache(registerHeader.getHash())).thenReturn(new StoredBlock(registerHeader, BigInteger.ZERO, 0));
-        BtcTransaction btcTransaction = mock(BtcTransaction.class);
-        doThrow(VerificationException.class).when(btcTransaction).verify();
-        btcTransaction.verify();
 
-        bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), mock(Sha256Hash.class), pmt.bitcoinSerialize(), mock(Sha256Hash.class), witnessReservedValue);
+        bridgeSupport.registerBtcCoinbaseTransaction(tx.bitcoinSerialize(), registerHeader.getHash(), pmt.bitcoinSerialize(), mock(Sha256Hash.class), Sha256Hash.ZERO_HASH.getBytes());
         verify(mock(BridgeStorageProvider.class), never()).setCoinbaseInformation(any(Sha256Hash.class), any(CoinbaseInformation.class));
     }
 
@@ -3793,8 +3775,8 @@ public class BridgeSupportTest {
 
         BtcTransaction tx1 = new BtcTransaction(btcParams, rawTx);
         BtcTransaction txWithoutWitness = new BtcTransaction(btcParams, rawTx);
+        txWithoutWitness.setWitness(0, null);
 
-        Sha256Hash secondHashTx = Sha256Hash.wrap(Hex.decode("e3d0840a0825fb7d880e5cb8306745352920a8c7e8a30fac882b275e26c6bb65"));
         byte[] witnessReservedValue = tx1.getWitness(0).getPush(0);
 
         BtcBlockStoreWithCache btcBlockStore = mock(BtcBlockStoreWithCache.class);
@@ -3817,17 +3799,14 @@ public class BridgeSupportTest {
         bits[0] = 0x3f;
 
         List<Sha256Hash> hashes = new ArrayList<>();
-        hashes.add(tx1.getHash());
-        hashes.add(secondHashTx);
-        PartialMerkleTree pmt = new PartialMerkleTree(btcParams, bits, hashes, 2);
-        List<Sha256Hash> hashlist = new ArrayList<>();
-        Sha256Hash merkleRoot = pmt.getTxnHashAndMerkleRoot(hashlist);
+        hashes.add(txWithoutWitness.getHash());
+        PartialMerkleTree pmt = new PartialMerkleTree(btcParams, bits, hashes, 1);
 
         co.rsk.bitcoinj.core.BtcBlock registerHeader = new co.rsk.bitcoinj.core.BtcBlock(
                 btcParams,
                 1,
                 PegTestUtils.createHash(1),
-                merkleRoot,
+                Sha256Hash.ZERO_HASH,
                 1,
                 1,
                 1,
@@ -3844,7 +3823,7 @@ public class BridgeSupportTest {
         when(storedBlock.getHeader()).thenReturn(btcBlock);
         when(btcBlockStore.getFromCache(registerHeader.getHash())).thenReturn(storedBlock);
 
-        bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), mock(Sha256Hash.class), pmt.bitcoinSerialize(), mock(Sha256Hash.class), witnessReservedValue);
+        bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), registerHeader.getHash(), pmt.bitcoinSerialize(), mock(Sha256Hash.class), witnessReservedValue);
         verify(mock(BridgeStorageProvider.class), never()).setCoinbaseInformation(any(Sha256Hash.class), any(CoinbaseInformation.class));
     }
 
@@ -3990,11 +3969,9 @@ public class BridgeSupportTest {
         when(btcBlockStore.getFromCache(registerHeader.getHash())).thenReturn(new StoredBlock(registerHeader, BigInteger.ZERO, 0));
         bridgeSupport.registerBtcCoinbaseTransaction(txWithoutWitness.bitcoinSerialize(), registerHeader.getHash(), pmt.bitcoinSerialize(), witnessRoot, witnessReservedValue);
 
-        CoinbaseInformation coinbaseInformation = new CoinbaseInformation(witnessRoot);
-
         ArgumentCaptor<CoinbaseInformation> argumentCaptor = ArgumentCaptor.forClass(CoinbaseInformation.class);
         verify(provider).setCoinbaseInformation(eq(registerHeader.getHash()), argumentCaptor.capture());
-        assertEquals(coinbaseInformation.getWitnessMerkleRoot(), argumentCaptor.getValue().getWitnessMerkleRoot());
+        assertEquals(witnessRoot, argumentCaptor.getValue().getWitnessMerkleRoot());
     }
 
     @Test
@@ -4004,7 +3981,7 @@ public class BridgeSupportTest {
 
         Repository repository = createRepository();
         Repository track = repository.startTracking();
-        BridgeStorageProvider provider = mock(BridgeStorageProvider.class);
+        BridgeStorageProvider provider = new BridgeStorageProvider(repository, PrecompiledContracts.BRIDGE_ADDR, bridgeConstants, activations);
 
         BridgeSupport bridgeSupport = getBridgeSupport(
                 bridgeConstants,
@@ -4028,7 +4005,7 @@ public class BridgeSupportTest {
 
         Repository repository = createRepository();
         Repository track = repository.startTracking();
-        BridgeStorageProvider provider = mock(BridgeStorageProvider.class);
+        BridgeStorageProvider provider = new BridgeStorageProvider(repository, PrecompiledContracts.BRIDGE_ADDR, bridgeConstants, activations);
 
         BridgeSupport bridgeSupport = getBridgeSupport(
                 bridgeConstants,
@@ -4042,7 +4019,6 @@ public class BridgeSupportTest {
 
         CoinbaseInformation coinbaseInformation = new CoinbaseInformation(Sha256Hash.ZERO_HASH);
         provider.setCoinbaseInformation(Sha256Hash.ZERO_HASH, coinbaseInformation);
-        when(provider.getCoinbaseInformation(Sha256Hash.ZERO_HASH)).thenReturn(coinbaseInformation);
         Assert.assertTrue(bridgeSupport.hasBtcBlockCoinbaseTransactionInformation(Sha256Hash.ZERO_HASH));
     }
 
@@ -4065,9 +4041,6 @@ public class BridgeSupportTest {
                 activations
         );
 
-        CoinbaseInformation coinbaseInformation = new CoinbaseInformation(Sha256Hash.ZERO_HASH);
-        provider.setCoinbaseInformation(Sha256Hash.ZERO_HASH, coinbaseInformation);
-        when(provider.getCoinbaseInformation(Sha256Hash.ZERO_HASH)).thenReturn(null);
         Assert.assertFalse(bridgeSupport.hasBtcBlockCoinbaseTransactionInformation(Sha256Hash.ZERO_HASH));
     }
 
